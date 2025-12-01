@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Tab Session Manager</title>
+  <link rel="stylesheet" href="../styles/popup.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>AI Tab Manager</h1>
+      <button id="settingsBtn" class="icon-btn" title="Settings">⚙️</button>
+    </header>
+
+    <div class="actions">
+      <button id="saveSessionBtn" class="primary-btn">
+        💾 Save Current Session
+      </button>
+    </div>
+
+    <div class="search-section">
+      <input
+        type="text"
+        id="searchInput"
+        placeholder="Search sessions... (e.g., 'sorting algorithms')"
+      >
+      <button id="searchBtn" class="icon-btn">🔍</button>
+    </div>
+
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="sessions">Sessions</button>
+      <button class="tab-btn" data-tab="search">Search Results</button>
+    </div>
+
+    <div id="loading" class="loading hidden">
+      <div class="spinner"></div>
+      <p>Loading...</p>
+    </div>
+
+    <div id="error" class="error hidden"></div>
+
+    <div class="tab-content active" id="sessionsTab">
+      <div id="sessionsList" class="sessions-list">
+        <p class="empty-state">No saved sessions yet. Save your first session!</p>
+      </div>
+    </div>
+
+    <div class="tab-content" id="searchTab">
+      <div id="searchResults" class="sessions-list">
+        <p class="empty-state">Search results will appear here</p>
+      </div>
+    </div>
+  </div>
+
+  <script src="../scripts/storage.js"></script>
+  <script src="../scripts/ai-service.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>
