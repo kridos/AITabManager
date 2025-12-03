@@ -48,6 +48,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       .catch(error => sendResponse({ error: error.message }));
     return true;
   }
+
+  if (request.action === 'restoreWithContainers') {
+    restoreSessionWithContainers(request.sessionId)
+      .then(sendResponse)
+      .catch(error => sendResponse({ error: error.message }));
+    return true;
+  }
 });
 
 // Capture all tabs from all windows
@@ -178,6 +185,118 @@ async function restoreSession(sessionId) {
     };
   } catch (error) {
     console.error('Error restoring session:', error);
+    throw error;
+  }
+}
+
+// Restore session with Firefox Container Tabs
+async function restoreSessionWithContainers(sessionId) {
+  try {
+    // Check if contextualIdentities API is available (Firefox only)
+    if (!chrome.contextualIdentities) {
+      throw new Error('Container tabs are only available in Firefox');
+    }
+
+    const result = await chrome.storage.local.get(['sessions']);
+    const sessions = result.sessions || [];
+    const session = sessions.find(s => s.id === sessionId);
+
+    if (!session) {
+      throw new Error('Session not found');
+    }
+
+    if (!session.tabGroups || session.tabGroups.length === 0) {
+      throw new Error('This session has no tab groups');
+    }
+
+    // Define container colors matching our UI
+    const containerColors = ['blue', 'orange', 'green', 'purple', 'red', 'yellow', 'pink', 'turquoise'];
+
+    // Filter out illegal URLs
+    const illegalPrefixes = [
+      'about:',
+      'chrome:',
+      'edge:',
+      'moz-extension:',
+      'chrome-extension:',
+      'firefox:',
+      'view-source:'
+    ];
+
+    const isValidUrl = (url) => {
+      const lowerUrl = url.toLowerCase();
+      return !illegalPrefixes.some(prefix => lowerUrl.startsWith(prefix));
+    };
+
+    // Create containers for each tab group
+    const containerMap = new Map(); // group index -> container id
+    let containersCreated = 0;
+
+    for (let i = 0; i < session.tabGroups.length; i++) {
+      const group = session.tabGroups[i];
+      const color = containerColors[i % containerColors.length];
+
+      try {
+        // Create container with group name and color
+        const container = await chrome.contextualIdentities.create({
+          name: group.name,
+          color: color,
+          icon: 'circle'
+        });
+
+        containerMap.set(i, container.cookieStoreId);
+        containersCreated++;
+      } catch (error) {
+        console.error(`Failed to create container for group ${group.name}:`, error);
+      }
+    }
+
+    // Restore tabs into their containers
+    let tabsRestored = 0;
+
+    for (let i = 0; i < session.tabGroups.length; i++) {
+      const group = session.tabGroups[i];
+      const cookieStoreId = containerMap.get(i);
+
+      if (!cookieStoreId) continue;
+
+      // Get tabs for this group
+      const tabsInGroup = group.tabIndices
+        .map(idx => session.tabs[idx - 1])
+        .filter(tab => tab && isValidUrl(tab.url));
+
+      if (tabsInGroup.length === 0) continue;
+
+      // Create window with first tab in container
+      const firstTab = tabsInGroup[0];
+      const window = await chrome.windows.create({
+        url: firstTab.url,
+        cookieStoreId: cookieStoreId
+      });
+      tabsRestored++;
+
+      // Add remaining tabs to the window
+      for (let j = 1; j < tabsInGroup.length; j++) {
+        try {
+          await chrome.tabs.create({
+            windowId: window.id,
+            url: tabsInGroup[j].url,
+            cookieStoreId: cookieStoreId
+          });
+          tabsRestored++;
+        } catch (error) {
+          console.error('Failed to create tab:', error);
+        }
+      }
+    }
+
+    return {
+      success: true,
+      containersCreated,
+      tabsRestored
+    };
+  } catch (error) {
+    console.error('Error restoring with containers:', error);
     throw error;
   }
 }

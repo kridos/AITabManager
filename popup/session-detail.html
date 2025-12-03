@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Session Details</title>
+  <link rel="stylesheet" href="../styles/session-detail.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <button id="backBtn" class="back-btn">← Back</button>
+      <h1 id="sessionName">Session Details</h1>
+    </header>
+
+    <div class="session-info">
+      <div id="sessionContext" class="context"></div>
+      <div class="meta">
+        <span id="sessionDate"></span>
+        <span id="sessionTabs"></span>
+        <span id="sessionWindows"></span>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button id="restoreBtn" class="primary-btn">🔄 Restore Session</button>
+      <button id="restoreContainersBtn" class="primary-btn">🎨 Restore with Colored Groups</button>
+    </div>
+
+    <div id="tabGroups" class="tab-groups">
+      <!-- Groups will be rendered here -->
+    </div>
+
+    <div id="ungroupedTabs" class="ungrouped-section">
+      <h2>All Tabs</h2>
+      <div class="tabs-list"></div>
+    </div>
+  </div>
+
+  <script src="../scripts/storage.js"></script>
+  <script src="session-detail.js"></script>
+</body>
+</html>

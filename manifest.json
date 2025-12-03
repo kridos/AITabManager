@@ -6,7 +6,9 @@
   "permissions": [
     "tabs",
     "storage",
-    "unlimitedStorage"
+    "unlimitedStorage",
+    "contextualIdentities",
+    "cookies"
   ],
   "host_permissions": [
     "http://*/*",

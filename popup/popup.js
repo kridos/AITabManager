@@ -170,6 +170,11 @@ function renderSessions() {
   container.querySelectorAll('.session-card').forEach(card => {
     const sessionId = card.dataset.sessionId;
 
+    // Click on card to view details
+    card.addEventListener('click', () => {
+      window.location.href = `session-detail.html?id=${sessionId}`;
+    });
+
     card.querySelector('.restore-btn').addEventListener('click', (e) => {
       e.stopPropagation();
       restoreSession(sessionId);
@@ -195,6 +200,11 @@ function renderSearchResults(results) {
   // Add event listeners
   container.querySelectorAll('.session-card').forEach(card => {
     const sessionId = card.dataset.sessionId;
+
+    // Click on card to view details
+    card.addEventListener('click', () => {
+      window.location.href = `session-detail.html?id=${sessionId}`;
+    });
 
     card.querySelector('.restore-btn').addEventListener('click', (e) => {
       e.stopPropagation();
