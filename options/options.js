@@ -13,10 +13,9 @@ async function init() {
 async function loadSettings() {
   const result = await chrome.storage.local.get(['settings']);
   settings = result.settings || {
-    aiProvider: 'anthropic',
+    aiProvider: 'anthropic', // Always Anthropic
     apiKey: '',
     model: 'claude-3-haiku-20240307',
-    searchSensitivity: 7,
     autoContext: true,
     autoTabGroups: false,
     multiWindow: true,
@@ -25,17 +24,12 @@ async function loadSettings() {
 }
 
 function populateForm() {
-  document.getElementById('aiProvider').value = settings.aiProvider || 'anthropic';
   document.getElementById('apiKey').value = settings.apiKey || '';
   document.getElementById('model').value = settings.model || 'claude-3-haiku-20240307';
-  document.getElementById('searchSensitivity').value = settings.searchSensitivity || 7;
   document.getElementById('autoContext').checked = settings.autoContext !== false;
   document.getElementById('autoTabGroups').checked = settings.autoTabGroups === true;
   document.getElementById('multiWindow').checked = settings.multiWindow !== false;
   document.getElementById('aiRanking').checked = settings.aiRanking !== false;
-
-  // Update model options based on provider
-  updateModelOptions();
 }
 
 function setupEventListeners() {
@@ -46,34 +40,13 @@ function setupEventListeners() {
   });
   document.getElementById('importFile').addEventListener('change', importSessions);
   document.getElementById('clearAllBtn').addEventListener('click', clearAllSessions);
-
-  document.getElementById('aiProvider').addEventListener('change', updateModelOptions);
-}
-
-function updateModelOptions() {
-  const provider = document.getElementById('aiProvider').value;
-  const modelSelect = document.getElementById('model');
-
-  if (provider === 'anthropic') {
-    modelSelect.innerHTML = `
-      <option value="claude-3-haiku-20240307">Claude 3 Haiku (Fast & Cheap)</option>
-      <option value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet (Recommended)</option>
-    `;
-  } else if (provider === 'openai') {
-    modelSelect.innerHTML = `
-      <option value="gpt-3.5-turbo">GPT-3.5 Turbo (Fast & Cheap)</option>
-      <option value="gpt-4">GPT-4</option>
-      <option value="gpt-4-turbo">GPT-4 Turbo</option>
-    `;
-  }
 }
 
 async function saveSettings() {
   const newSettings = {
-    aiProvider: document.getElementById('aiProvider').value,
+    aiProvider: 'anthropic', // Always Anthropic
     apiKey: document.getElementById('apiKey').value,
     model: document.getElementById('model').value,
-    searchSensitivity: parseInt(document.getElementById('searchSensitivity').value),
     autoContext: document.getElementById('autoContext').checked,
     autoTabGroups: document.getElementById('autoTabGroups').checked,
     multiWindow: document.getElementById('multiWindow').checked,
