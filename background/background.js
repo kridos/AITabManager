@@ -371,20 +371,6 @@ async function generateContextForSession(sessionId, tabs) {
       }
     }
 
-    // Generate embedding for semantic search
-    let embedding = null;
-    try {
-      if (settings.aiProvider === 'openai') {
-        console.log('Generating embedding...');
-        embedding = await aiService.generateEmbedding(context);
-        await StorageService.saveEmbedding(sessionId, embedding);
-        console.log('Embedding saved');
-      }
-    } catch (embeddingError) {
-      console.warn('Failed to generate embedding:', embeddingError);
-      // Continue without embedding
-    }
-
     // Prepare updates
     const updates = {
       context,
@@ -402,8 +388,7 @@ async function generateContextForSession(sessionId, tabs) {
 
     return {
       context,
-      tabGroups,
-      hasEmbedding: embedding !== null
+      tabGroups
     };
   } catch (error) {
     console.error('Error generating context:', error);
@@ -437,53 +422,16 @@ async function searchSessionsSemantically(query) {
     const sessionsWithContext = sessions.filter(s => s.context);
     console.log('Sessions with context:', sessionsWithContext.length);
 
-    let candidateSessions = sessions;
-    let searchMethod = 'text';
-
-    // If using OpenAI, try semantic search with embeddings
-    if (settings.aiProvider === 'openai' && settings.apiKey && sessionsWithContext.length > 0) {
-      try {
-        const aiService = new AIService(settings);
-        const queryEmbedding = await aiService.generateEmbedding(query);
-        const allEmbeddings = await StorageService.getAllEmbeddings();
-
-        // Calculate similarities
-        const results = [];
-        for (const embData of allEmbeddings) {
-          const session = sessions.find(s => s.id === embData.sessionId);
-          if (session && embData.embedding) {
-            const similarity = AIService.cosineSimilarity(queryEmbedding, embData.embedding);
-            results.push({ session, similarity });
-          }
-        }
-
-        // Sort by similarity and filter by threshold
-        const threshold = (11 - settings.searchSensitivity) / 10; // Convert 1-10 to 1.0-0.1
-        candidateSessions = results
-          .filter(r => r.similarity >= threshold)
-          .sort((a, b) => b.similarity - a.similarity)
-          .map(r => r.session);
-
-        searchMethod = 'embedding';
-        console.log('Embedding search found:', candidateSessions.length, 'results');
-      } catch (error) {
-        console.warn('Embedding search failed, falling back:', error);
+    // Text search in session names and context
+    let candidateSessions = sessions.filter(session => {
+      const searchText = `${session.name} ${session.context || ''}`.toLowerCase();
+      const matches = searchText.includes(query.toLowerCase());
+      if (matches) {
+        console.log('Text match found:', session.name);
       }
-    }
-
-    // Use text search if no embedding results or not using OpenAI
-    if (candidateSessions.length === 0 || searchMethod === 'text') {
-      candidateSessions = sessions.filter(session => {
-        const searchText = `${session.name} ${session.context || ''}`.toLowerCase();
-        const matches = searchText.includes(query.toLowerCase());
-        if (matches) {
-          console.log('Text match found:', session.name);
-        }
-        return matches;
-      });
-      searchMethod = 'text';
-      console.log('Text search found:', candidateSessions.length, 'results');
-    }
+      return matches;
+    });
+    console.log('Text search found:', candidateSessions.length, 'results');
 
     // Use AI to rank ALL sessions if text search found nothing but we have context
     // This allows semantic search even when keywords don't match!
