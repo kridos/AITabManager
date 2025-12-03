@@ -190,7 +190,7 @@ async function restoreWithContainers() {
       return;
     }
 
-    alert(`Session restored with colored tab groups!\n${response.containersCreated} containers created\n${response.tabsRestored} tabs restored`);
+    alert(`Session restored with colored tab groups!\n${response.containersCreated} containers created\n${response.tabsRestored} tabs restored\n${response.windowsCreated} windows created`);
   } catch (error) {
     alert('Failed to restore with containers: ' + error.message);
   }

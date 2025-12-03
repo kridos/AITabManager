@@ -251,8 +251,12 @@ async function restoreSessionWithContainers(sessionId) {
       }
     }
 
-    // Restore tabs into their containers
+    // Restore tabs into their containers, packing groups into windows
+    const MAX_TABS_PER_WINDOW = 20;
     let tabsRestored = 0;
+    let windowsCreated = 0;
+    let currentWindow = null;
+    let currentWindowTabCount = 0;
 
     for (let i = 0; i < session.tabGroups.length; i++) {
       const group = session.tabGroups[i];
@@ -267,25 +271,47 @@ async function restoreSessionWithContainers(sessionId) {
 
       if (tabsInGroup.length === 0) continue;
 
-      // Create window with first tab in container
-      const firstTab = tabsInGroup[0];
-      const window = await chrome.windows.create({
-        url: firstTab.url,
-        cookieStoreId: cookieStoreId
-      });
-      tabsRestored++;
+      // Check if we need a new window
+      // Create new window if: no window exists, or adding this group would exceed limit
+      if (!currentWindow || (currentWindowTabCount + tabsInGroup.length > MAX_TABS_PER_WINDOW)) {
+        // Create new window with first tab of this group
+        const firstTab = tabsInGroup[0];
+        currentWindow = await chrome.windows.create({
+          url: firstTab.url,
+          cookieStoreId: cookieStoreId
+        });
+        windowsCreated++;
+        currentWindowTabCount = 1;
+        tabsRestored++;
 
-      // Add remaining tabs to the window
-      for (let j = 1; j < tabsInGroup.length; j++) {
-        try {
-          await chrome.tabs.create({
-            windowId: window.id,
-            url: tabsInGroup[j].url,
-            cookieStoreId: cookieStoreId
-          });
-          tabsRestored++;
-        } catch (error) {
-          console.error('Failed to create tab:', error);
+        // Add remaining tabs from this group to the new window
+        for (let j = 1; j < tabsInGroup.length; j++) {
+          try {
+            await chrome.tabs.create({
+              windowId: currentWindow.id,
+              url: tabsInGroup[j].url,
+              cookieStoreId: cookieStoreId
+            });
+            tabsRestored++;
+            currentWindowTabCount++;
+          } catch (error) {
+            console.error('Failed to create tab:', error);
+          }
+        }
+      } else {
+        // Add all tabs from this group to the current window
+        for (let j = 0; j < tabsInGroup.length; j++) {
+          try {
+            await chrome.tabs.create({
+              windowId: currentWindow.id,
+              url: tabsInGroup[j].url,
+              cookieStoreId: cookieStoreId
+            });
+            tabsRestored++;
+            currentWindowTabCount++;
+          } catch (error) {
+            console.error('Failed to create tab:', error);
+          }
         }
       }
     }
@@ -293,7 +319,8 @@ async function restoreSessionWithContainers(sessionId) {
     return {
       success: true,
       containersCreated,
-      tabsRestored
+      tabsRestored,
+      windowsCreated
     };
   } catch (error) {
     console.error('Error restoring with containers:', error);
