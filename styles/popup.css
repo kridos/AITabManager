@@ -185,6 +185,16 @@ header h1 {
   line-height: 1.4;
 }
 
+.session-groups {
+  font-size: 11px;
+  color: #667eea;
+  margin-bottom: 8px;
+  padding: 4px 8px;
+  background: #f0f3ff;
+  border-radius: 4px;
+  display: inline-block;
+}
+
 .session-meta {
   display: flex;
   gap: 12px;

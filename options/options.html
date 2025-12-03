@@ -41,6 +41,33 @@
     </div>
 
     <div class="settings-section">
+      <h2>AI Features</h2>
+
+      <div class="form-group">
+        <label>
+          <input type="checkbox" id="autoContext">
+          Automatically generate AI context descriptions when saving
+        </label>
+      </div>
+
+      <div class="form-group">
+        <label>
+          <input type="checkbox" id="autoTabGroups">
+          Automatically organize tabs into AI-generated groups
+        </label>
+        <small>AI will categorize tabs by topic when saving sessions</small>
+      </div>
+
+      <div class="form-group">
+        <label>
+          <input type="checkbox" id="multiWindow">
+          Save tabs from all browser windows (not just current window)
+        </label>
+        <small>When enabled, captures tabs from every open window</small>
+      </div>
+    </div>
+
+    <div class="settings-section">
       <h2>Search Settings</h2>
 
       <div class="form-group">
@@ -51,9 +78,10 @@
 
       <div class="form-group">
         <label>
-          <input type="checkbox" id="autoContext">
-          Automatically generate context when saving sessions
+          <input type="checkbox" id="aiRanking">
+          Use AI to rank search results (shows top 3 most relevant)
         </label>
+        <small>AI intelligently ranks results based on relevance to your query</small>
       </div>
     </div>
 

@@ -213,6 +213,17 @@ function createSessionCard(session) {
   const time = new Date(session.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const context = session.context || 'No description available';
 
+  // Tab groups display
+  let groupsHtml = '';
+  if (session.tabGroups && session.tabGroups.length > 0) {
+    const groupNames = session.tabGroups.map(g => g.name).join(', ');
+    groupsHtml = `<div class="session-groups">🏷️ ${escapeHtml(groupNames)}</div>`;
+  }
+
+  // Window count
+  const windowCount = session.windowCount || 1;
+  const windowText = windowCount > 1 ? `🪟 ${windowCount} windows` : '';
+
   return `
     <div class="session-card" data-session-id="${session.id}">
       <div class="session-header">
@@ -223,10 +234,12 @@ function createSessionCard(session) {
         </div>
       </div>
       <div class="session-context">${escapeHtml(context)}</div>
+      ${groupsHtml}
       <div class="session-meta">
         <span>📅 ${date}</span>
         <span>🕐 ${time}</span>
         <span>📑 ${session.tabCount} tabs</span>
+        ${windowText ? `<span>${windowText}</span>` : ''}
       </div>
     </div>
   `;

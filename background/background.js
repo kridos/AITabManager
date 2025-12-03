@@ -50,24 +50,56 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 });
 
-// Capture all tabs in current window
+// Capture all tabs from all windows
 async function captureCurrentSession(sessionName = '') {
   try {
-    const tabs = await chrome.tabs.query({ currentWindow: true });
+    const settings = await StorageService.getSettings();
+    const multiWindow = settings.multiWindow !== false; // Default to true
 
-    const tabData = tabs.map(tab => ({
-      url: tab.url,
-      title: tab.title,
-      favIconUrl: tab.favIconUrl,
-      index: tab.index
-    }));
+    let allTabs;
+    let windows = [];
+
+    if (multiWindow) {
+      // Get all windows and their tabs
+      const allWindows = await chrome.windows.getAll({ populate: true });
+      windows = allWindows.map(window => ({
+        id: window.id,
+        focused: window.focused,
+        type: window.type,
+        tabCount: window.tabs.length
+      }));
+
+      allTabs = allWindows.flatMap((window, windowIndex) =>
+        window.tabs.map(tab => ({
+          url: tab.url,
+          title: tab.title,
+          favIconUrl: tab.favIconUrl,
+          index: tab.index,
+          windowIndex: windowIndex,
+          windowId: window.id,
+          active: tab.active
+        }))
+      );
+    } else {
+      // Only current window (old behavior)
+      const tabs = await chrome.tabs.query({ currentWindow: true });
+      allTabs = tabs.map(tab => ({
+        url: tab.url,
+        title: tab.title,
+        favIconUrl: tab.favIconUrl,
+        index: tab.index,
+        windowIndex: 0
+      }));
+    }
 
     const session = {
       id: Date.now().toString(),
       name: sessionName || `Session ${new Date().toLocaleString()}`,
-      tabs: tabData,
+      tabs: allTabs,
+      windows: windows,
       timestamp: Date.now(),
-      tabCount: tabData.length
+      tabCount: allTabs.length,
+      windowCount: multiWindow ? windows.length : 1
     };
 
     return session;
@@ -99,25 +131,50 @@ async function restoreSession(sessionId) {
       'view-source:'
     ];
 
-    const validUrls = session.tabs
-      .map(tab => tab.url)
-      .filter(url => {
-        const lowerUrl = url.toLowerCase();
-        return !illegalPrefixes.some(prefix => lowerUrl.startsWith(prefix));
-      });
+    const isValidUrl = (url) => {
+      const lowerUrl = url.toLowerCase();
+      return !illegalPrefixes.some(prefix => lowerUrl.startsWith(prefix));
+    };
 
-    if (validUrls.length === 0) {
-      throw new Error('No valid URLs to restore (all were protected browser pages)');
+    // Check if session has multiple windows
+    const hasMultipleWindows = session.windows && session.windows.length > 1;
+    let totalRestored = 0;
+    let totalSkipped = 0;
+
+    if (hasMultipleWindows) {
+      // Restore each window separately
+      for (let windowIndex = 0; windowIndex < session.windows.length; windowIndex++) {
+        const windowTabs = session.tabs.filter(tab => tab.windowIndex === windowIndex);
+        const validUrls = windowTabs
+          .map(tab => tab.url)
+          .filter(isValidUrl);
+
+        if (validUrls.length > 0) {
+          await chrome.windows.create({ url: validUrls });
+          totalRestored += validUrls.length;
+        }
+        totalSkipped += windowTabs.length - validUrls.length;
+      }
+    } else {
+      // Single window restore
+      const validUrls = session.tabs
+        .map(tab => tab.url)
+        .filter(isValidUrl);
+
+      if (validUrls.length === 0) {
+        throw new Error('No valid URLs to restore (all were protected browser pages)');
+      }
+
+      await chrome.windows.create({ url: validUrls });
+      totalRestored = validUrls.length;
+      totalSkipped = session.tabs.length - validUrls.length;
     }
 
-    // Create new window with valid tabs only
-    await chrome.windows.create({ url: validUrls });
-
-    const skipped = session.tabs.length - validUrls.length;
     return {
       success: true,
-      restored: validUrls.length,
-      skipped: skipped
+      restored: totalRestored,
+      skipped: totalSkipped,
+      windowsRestored: hasMultipleWindows ? session.windows.length : 1
     };
   } catch (error) {
     console.error('Error restoring session:', error);
@@ -143,6 +200,18 @@ async function generateContextForSession(sessionId, tabs) {
     const context = await aiService.generateContext(tabs);
     console.log('Generated context:', context);
 
+    // Generate tab groups if enabled
+    let tabGroups = [];
+    if (settings.autoTabGroups) {
+      try {
+        console.log('Generating tab groups...');
+        tabGroups = await aiService.generateTabGroups(tabs);
+        console.log('Generated tab groups:', tabGroups);
+      } catch (groupError) {
+        console.warn('Failed to generate tab groups:', groupError);
+      }
+    }
+
     // Generate embedding for semantic search
     let embedding = null;
     try {
@@ -157,25 +226,42 @@ async function generateContextForSession(sessionId, tabs) {
       // Continue without embedding
     }
 
-    // Update session with context
-    await StorageService.updateSession(sessionId, { context });
-    console.log('Session updated with context');
+    // Update session with context and groups
+    await StorageService.updateSession(sessionId, {
+      context,
+      tabGroups: tabGroups.length > 0 ? tabGroups : undefined
+    });
+    console.log('Session updated with context and groups');
 
-    return { context, hasEmbedding: embedding !== null };
+    return {
+      context,
+      tabGroups,
+      hasEmbedding: embedding !== null
+    };
   } catch (error) {
     console.error('Error generating context:', error);
     throw error;
   }
 }
 
-// Search sessions using semantic search
+// Search sessions using semantic search and AI ranking
 async function searchSessionsSemantically(query) {
   try {
     const settings = await StorageService.getSettings();
     const sessions = await StorageService.getSessions();
 
+    if (sessions.length === 0) {
+      return { results: [], method: 'none' };
+    }
+
+    // Filter sessions with context descriptions
+    const sessionsWithContext = sessions.filter(s => s.context);
+
+    let candidateSessions = sessions;
+    let searchMethod = 'text';
+
     // If using OpenAI, try semantic search with embeddings
-    if (settings.aiProvider === 'openai' && settings.apiKey) {
+    if (settings.aiProvider === 'openai' && settings.apiKey && sessionsWithContext.length > 0) {
       try {
         const aiService = new AIService(settings);
         const queryEmbedding = await aiService.generateEmbedding(query);
@@ -193,24 +279,44 @@ async function searchSessionsSemantically(query) {
 
         // Sort by similarity and filter by threshold
         const threshold = (11 - settings.searchSensitivity) / 10; // Convert 1-10 to 1.0-0.1
-        const filtered = results
+        candidateSessions = results
           .filter(r => r.similarity >= threshold)
           .sort((a, b) => b.similarity - a.similarity)
           .map(r => r.session);
 
-        return { results: filtered, method: 'semantic' };
+        searchMethod = 'embedding';
       } catch (error) {
-        console.warn('Semantic search failed, falling back to text search:', error);
+        console.warn('Embedding search failed, falling back:', error);
       }
     }
 
-    // Fallback to simple text search
-    const results = sessions.filter(session => {
-      const searchText = `${session.name} ${session.context || ''}`.toLowerCase();
-      return searchText.includes(query.toLowerCase());
-    });
+    // If we have few results or no embedding search, use text search
+    if (candidateSessions.length < 3 || searchMethod === 'text') {
+      candidateSessions = sessions.filter(session => {
+        const searchText = `${session.name} ${session.context || ''}`.toLowerCase();
+        return searchText.includes(query.toLowerCase());
+      });
+      searchMethod = 'text';
+    }
 
-    return { results, method: 'text' };
+    // Use AI to rank top 3 if we have context descriptions and API key
+    if (settings.apiKey && candidateSessions.length > 3 && sessionsWithContext.length > 0) {
+      try {
+        console.log('Using AI to rank search results...');
+        const aiService = new AIService(settings);
+        const topResults = await aiService.rankSessionsByRelevance(query, candidateSessions);
+        console.log('AI ranked top results:', topResults.length);
+        return { results: topResults, method: 'ai-ranked' };
+      } catch (error) {
+        console.warn('AI ranking failed, returning all matches:', error);
+      }
+    }
+
+    // Return top 10 results if no AI ranking
+    return {
+      results: candidateSessions.slice(0, 10),
+      method: searchMethod
+    };
   } catch (error) {
     console.error('Error searching sessions:', error);
     throw error;

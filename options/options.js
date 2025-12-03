@@ -17,7 +17,10 @@ async function loadSettings() {
     apiKey: '',
     model: 'claude-3-haiku-20240307',
     searchSensitivity: 7,
-    autoContext: true
+    autoContext: true,
+    autoTabGroups: false,
+    multiWindow: true,
+    aiRanking: true
   };
 }
 
@@ -27,6 +30,9 @@ function populateForm() {
   document.getElementById('model').value = settings.model || 'claude-3-haiku-20240307';
   document.getElementById('searchSensitivity').value = settings.searchSensitivity || 7;
   document.getElementById('autoContext').checked = settings.autoContext !== false;
+  document.getElementById('autoTabGroups').checked = settings.autoTabGroups === true;
+  document.getElementById('multiWindow').checked = settings.multiWindow !== false;
+  document.getElementById('aiRanking').checked = settings.aiRanking !== false;
 
   // Update model options based on provider
   updateModelOptions();
@@ -68,7 +74,10 @@ async function saveSettings() {
     apiKey: document.getElementById('apiKey').value,
     model: document.getElementById('model').value,
     searchSensitivity: parseInt(document.getElementById('searchSensitivity').value),
-    autoContext: document.getElementById('autoContext').checked
+    autoContext: document.getElementById('autoContext').checked,
+    autoTabGroups: document.getElementById('autoTabGroups').checked,
+    multiWindow: document.getElementById('multiWindow').checked,
+    aiRanking: document.getElementById('aiRanking').checked
   };
 
   await chrome.storage.local.set({ settings: newSettings });
