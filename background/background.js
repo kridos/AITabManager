@@ -309,24 +309,31 @@ async function searchSessionsSemantically(query) {
       console.log('Text search found:', candidateSessions.length, 'results');
     }
 
-    // If no results found, return empty
+    // Use AI to rank ALL sessions if text search found nothing but we have context
+    // This allows semantic search even when keywords don't match!
+    if (settings.aiRanking && settings.apiKey && sessionsWithContext.length > 0) {
+      // If text search failed, give AI all sessions with context
+      const sessionsToRank = candidateSessions.length > 0 ? candidateSessions : sessionsWithContext;
+
+      try {
+        console.log('Using AI to rank search results...');
+        console.log('Ranking', sessionsToRank.length, 'sessions');
+        const aiService = new AIService(settings);
+        const topResults = await aiService.rankSessionsByRelevance(query, sessionsToRank);
+        console.log('AI ranked results:', topResults.length);
+
+        if (topResults.length > 0) {
+          return { results: topResults, method: 'ai-ranked' };
+        }
+      } catch (error) {
+        console.warn('AI ranking failed:', error);
+      }
+    }
+
+    // If no results found after all attempts, return empty
     if (candidateSessions.length === 0) {
       console.log('No results found for query:', query);
       return { results: [], method: searchMethod };
-    }
-
-    // Use AI to rank results if enabled and we have an API key
-    // Changed: Now works with ANY number of results (not just >3)
-    if (settings.aiRanking && settings.apiKey && sessionsWithContext.length > 0) {
-      try {
-        console.log('Using AI to rank search results...');
-        const aiService = new AIService(settings);
-        const topResults = await aiService.rankSessionsByRelevance(query, candidateSessions);
-        console.log('AI ranked results:', topResults.length);
-        return { results: topResults, method: 'ai-ranked' };
-      } catch (error) {
-        console.warn('AI ranking failed, returning text/embedding matches:', error);
-      }
     }
 
     // Return top 10 results if no AI ranking
