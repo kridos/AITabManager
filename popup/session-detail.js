@@ -33,6 +33,11 @@ async function loadSession() {
   const sessions = await StorageService.getSessions();
   session = sessions.find(s => s.id === sessionId);
 
+  console.log('Loading session:', sessionId);
+  console.log('Session data:', session);
+  console.log('Tab groups:', session?.tabGroups);
+  console.log('Tab groups length:', session?.tabGroups?.length);
+
   if (!session) {
     window.location.href = 'popup.html';
   }
@@ -57,13 +62,25 @@ function renderSession() {
   }
 
   // Render tab groups if available
+  console.log('Checking tab groups...', session.tabGroups);
   if (session.tabGroups && session.tabGroups.length > 0) {
+    console.log('Rendering tab groups');
     renderTabGroups();
     document.getElementById('ungroupedTabs').classList.add('hidden');
   } else {
+    console.log('No tab groups, rendering all tabs');
     renderAllTabs();
     document.getElementById('tabGroups').classList.add('hidden');
   }
+
+  // Add error handlers for favicon images (to fix CSP error)
+  setTimeout(() => {
+    document.querySelectorAll('.tab-icon').forEach(img => {
+      img.addEventListener('error', function() {
+        this.src = this.dataset.fallback;
+      });
+    });
+  }, 0);
 }
 
 function renderTabGroups() {
@@ -98,9 +115,12 @@ function renderAllTabs() {
 }
 
 function createTabItem(tab) {
+  const defaultIcon = 'data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2216%22 height=%2216%22><rect width=%2216%22 height=%2216%22 fill=%22%23ccc%22/></svg>';
+  const iconSrc = tab.favIconUrl || defaultIcon;
+
   return `
     <div class="tab-item">
-      <img class="tab-icon" src="${tab.favIconUrl || 'data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2216%22 height=%2216%22><rect width=%2216%22 height=%2216%22 fill=%22%23ccc%22/></svg>'}" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2216%22 height=%2216%22><rect width=%2216%22 height=%2216%22 fill=%22%23ccc%22/></svg>'">
+      <img class="tab-icon" src="${iconSrc}" data-fallback="${defaultIcon}">
       <div class="tab-title">${escapeHtml(tab.title)}</div>
       <div class="tab-url">${escapeHtml(new URL(tab.url).hostname)}</div>
     </div>
