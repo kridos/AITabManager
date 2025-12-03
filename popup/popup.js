@@ -139,14 +139,11 @@ async function generateContextForSession(sessionId) {
 
     console.log('Context generated successfully:', response.context);
 
-    // Update local session with context
-    const sessionIndex = sessions.findIndex(s => s.id === sessionId);
-    if (sessionIndex !== -1) {
-      sessions[sessionIndex].context = response.context;
-      await saveSessions();
-      renderSessions();
-      console.log('Session updated with context');
-    }
+    // DON'T update local session and save - the background script already saved everything
+    // Just reload from storage to get the complete updated session with tab groups
+    await loadSessions();
+    renderSessions();
+    console.log('Session reloaded from storage with all updates');
   } catch (error) {
     console.error('Error generating context:', error);
   }
