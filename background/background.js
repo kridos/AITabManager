@@ -1,7 +1,5 @@
 // Background service worker for AI Tab Session Manager
-
-// Import utility scripts
-importScripts('../scripts/storage.js', '../scripts/ai-service.js');
+// Utility scripts are loaded via manifest.json
 
 // Initialize extension
 chrome.runtime.onInstalled.addListener(() => {
