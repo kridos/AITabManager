@@ -305,9 +305,20 @@ async function restoreSessionWithContainers(sessionId) {
 async function generateContextForSession(sessionId, tabs) {
   try {
     console.log('Generating context for session:', sessionId);
+
+    // Mark session as generating
+    await StorageService.updateSession(sessionId, {
+      generatingContext: true,
+      generationStatus: 'Generating AI context and tab groups...'
+    });
+
     const settings = await StorageService.getSettings();
 
     if (!settings.apiKey) {
+      await StorageService.updateSession(sessionId, {
+        generatingContext: false,
+        generationStatus: 'Error: API key not configured'
+      });
       throw new Error('API key not configured. Please add your API key in settings.');
     }
 
@@ -326,6 +337,8 @@ async function generateContextForSession(sessionId, tabs) {
         console.log('Generating tab groups...');
         tabGroups = await aiService.generateTabGroups(tabs);
         console.log('Generated tab groups:', tabGroups);
+        console.log('Tab groups type:', typeof tabGroups, 'Is array:', Array.isArray(tabGroups));
+        console.log('Tab groups length:', tabGroups.length);
       } catch (groupError) {
         console.warn('Failed to generate tab groups:', groupError);
       }
@@ -345,11 +358,19 @@ async function generateContextForSession(sessionId, tabs) {
       // Continue without embedding
     }
 
-    // Update session with context and groups
-    await StorageService.updateSession(sessionId, {
+    // Prepare updates
+    const updates = {
       context,
-      tabGroups: tabGroups.length > 0 ? tabGroups : undefined
-    });
+      tabGroups: tabGroups.length > 0 ? tabGroups : undefined,
+      generatingContext: false,
+      generationStatus: 'Complete'
+    };
+
+    console.log('About to update session with:', updates);
+    console.log('Tab groups being saved:', updates.tabGroups);
+
+    // Update session with context and groups
+    await StorageService.updateSession(sessionId, updates);
     console.log('Session updated with context and groups');
 
     return {
@@ -359,6 +380,15 @@ async function generateContextForSession(sessionId, tabs) {
     };
   } catch (error) {
     console.error('Error generating context:', error);
+    // Mark as failed
+    try {
+      await StorageService.updateSession(sessionId, {
+        generatingContext: false,
+        generationStatus: `Error: ${error.message}`
+      });
+    } catch (updateError) {
+      console.error('Failed to update error status:', updateError);
+    }
     throw error;
   }
 }

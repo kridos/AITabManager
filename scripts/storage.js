@@ -18,6 +18,7 @@ class StorageService {
   }
 
   static async updateSession(sessionId, updates) {
+    console.log('updateSession called with:', sessionId, updates);
     const sessions = await this.getSessions();
     const index = sessions.findIndex(s => s.id === sessionId);
 
@@ -25,8 +26,19 @@ class StorageService {
       throw new Error('Session not found');
     }
 
+    console.log('Session before update:', sessions[index]);
     sessions[index] = { ...sessions[index], ...updates };
+    console.log('Session after update:', sessions[index]);
+    console.log('Tab groups in updated session:', sessions[index].tabGroups);
+
     await this.saveSessions(sessions);
+
+    // Verify it was saved
+    const verifyResult = await this.getSessions();
+    const verifiedSession = verifyResult.find(s => s.id === sessionId);
+    console.log('Verified session from storage:', verifiedSession);
+    console.log('Verified tab groups:', verifiedSession?.tabGroups);
+
     return sessions[index];
   }
 

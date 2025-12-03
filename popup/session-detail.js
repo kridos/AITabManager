@@ -47,9 +47,21 @@ function renderSession() {
   // Set session name
   document.getElementById('sessionName').textContent = session.name;
 
-  // Set context
+  // Set context with generation status
   const contextEl = document.getElementById('sessionContext');
-  contextEl.textContent = session.context || 'No description available';
+  if (session.generatingContext) {
+    contextEl.innerHTML = `<span class="generating">⏳ ${escapeHtml(session.generationStatus || 'Generating...')}</span>`;
+    contextEl.style.fontStyle = 'italic';
+    contextEl.style.color = '#667eea';
+  } else if (session.context) {
+    contextEl.textContent = session.context;
+    contextEl.style.fontStyle = 'normal';
+    contextEl.style.color = '#333';
+  } else {
+    contextEl.textContent = 'No description available';
+    contextEl.style.fontStyle = 'normal';
+    contextEl.style.color = '#999';
+  }
 
   // Set metadata
   const date = new Date(session.timestamp).toLocaleDateString();
@@ -81,6 +93,14 @@ function renderSession() {
       });
     });
   }, 0);
+
+  // Auto-refresh if still generating
+  if (session.generatingContext) {
+    setTimeout(async () => {
+      await loadSession();
+      renderSession();
+    }, 2000);
+  }
 }
 
 function renderTabGroups() {

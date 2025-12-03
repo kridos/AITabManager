@@ -59,16 +59,50 @@ async function saveSession() {
     sessions.unshift(response);
     await saveSessions();
 
-    // Generate AI context in background (will be implemented later)
+    // Generate AI context in background
     generateContextForSession(response.id);
 
     showLoading(false);
     renderSessions();
     switchTab('sessions');
+
+    // Auto-refresh every 2 seconds to show generation progress
+    startAutoRefresh();
   } catch (error) {
     showError('Failed to save session: ' + error.message);
     showLoading(false);
   }
+}
+
+let autoRefreshInterval = null;
+
+function startAutoRefresh() {
+  // Clear any existing interval
+  if (autoRefreshInterval) {
+    clearInterval(autoRefreshInterval);
+  }
+
+  // Refresh every 2 seconds while any session is generating
+  autoRefreshInterval = setInterval(async () => {
+    await loadSessions();
+    const hasGenerating = sessions.some(s => s.generatingContext);
+
+    if (hasGenerating) {
+      renderSessions();
+    } else {
+      // Stop refreshing when all done
+      clearInterval(autoRefreshInterval);
+      autoRefreshInterval = null;
+    }
+  }, 2000);
+
+  // Stop after 60 seconds max
+  setTimeout(() => {
+    if (autoRefreshInterval) {
+      clearInterval(autoRefreshInterval);
+      autoRefreshInterval = null;
+    }
+  }, 60000);
 }
 
 async function generateContextForSession(sessionId) {
@@ -221,7 +255,16 @@ function renderSearchResults(results) {
 function createSessionCard(session) {
   const date = new Date(session.timestamp).toLocaleDateString();
   const time = new Date(session.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  const context = session.context || 'No description available';
+
+  // Context or generation status
+  let contextHtml = '';
+  if (session.generatingContext) {
+    contextHtml = `<div class="session-context generating">⏳ ${escapeHtml(session.generationStatus || 'Generating...')}</div>`;
+  } else if (session.context) {
+    contextHtml = `<div class="session-context">${escapeHtml(session.context)}</div>`;
+  } else {
+    contextHtml = `<div class="session-context">No description available</div>`;
+  }
 
   // Tab groups display
   let groupsHtml = '';
@@ -243,7 +286,7 @@ function createSessionCard(session) {
           <button class="delete-btn" title="Delete">🗑️</button>
         </div>
       </div>
-      <div class="session-context">${escapeHtml(context)}</div>
+      ${contextHtml}
       ${groupsHtml}
       <div class="session-meta">
         <span>📅 ${date}</span>

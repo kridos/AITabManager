@@ -185,6 +185,17 @@ header h1 {
   line-height: 1.4;
 }
 
+.session-context.generating {
+  color: #667eea;
+  font-style: italic;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
 .session-groups {
   font-size: 11px;
   color: #667eea;
