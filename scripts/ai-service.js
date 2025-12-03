@@ -26,12 +26,20 @@ class AIService {
       `${i + 1}. ${tab.title} (${tab.url})`
     ).join('\n');
 
-    const prompt = `Analyze these browser tabs and generate a concise, searchable description of what the user was working on. Focus on the main topic, purpose, and key themes. Keep it under 100 words.
+    const prompt = `Analyze these browser tabs and create a concise summary of what the user was working on.
 
 Tabs:
 ${tabList}
 
-Provide a natural language description that someone could use to search for this session later.`;
+Return ONLY 2-4 short bullet points (use • as bullets). Each bullet should be under 10 words. Focus on:
+- Main topics or projects
+- Key activities or tasks
+- Important tools or platforms being used
+
+Example format:
+• Working on CSE 333 homework assignment
+• Browsing documentation for React hooks
+• Managing email and calendar events`;
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -65,12 +73,20 @@ Provide a natural language description that someone could use to search for this
       `${i + 1}. ${tab.title} (${tab.url})`
     ).join('\n');
 
-    const prompt = `Analyze these browser tabs and generate a concise, searchable description of what the user was working on. Focus on the main topic, purpose, and key themes. Keep it under 100 words.
+    const prompt = `Analyze these browser tabs and create a concise summary of what the user was working on.
 
 Tabs:
 ${tabList}
 
-Provide a natural language description that someone could use to search for this session later.`;
+Return ONLY 2-4 short bullet points (use • as bullets). Each bullet should be under 10 words. Focus on:
+- Main topics or projects
+- Key activities or tasks
+- Important tools or platforms being used
+
+Example format:
+• Working on CSE 333 homework assignment
+• Browsing documentation for React hooks
+• Managing email and calendar events`;
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
