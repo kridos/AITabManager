@@ -73,16 +73,23 @@ async function saveSession() {
 
 async function generateContextForSession(sessionId) {
   try {
+    console.log('generateContextForSession called for:', sessionId);
+    console.log('Auto-context enabled:', settings.autoContext);
+
     // Check if auto-context is enabled
     if (!settings.autoContext) {
+      console.log('Auto-context is disabled, skipping');
       return;
     }
 
     // Find the session
     const session = sessions.find(s => s.id === sessionId);
     if (!session) {
+      console.log('Session not found:', sessionId);
       return;
     }
+
+    console.log('Requesting context generation from background script...');
 
     // Generate context in background
     const response = await chrome.runtime.sendMessage({
@@ -96,12 +103,15 @@ async function generateContextForSession(sessionId) {
       return;
     }
 
+    console.log('Context generated successfully:', response.context);
+
     // Update local session with context
     const sessionIndex = sessions.findIndex(s => s.id === sessionId);
     if (sessionIndex !== -1) {
       sessions[sessionIndex].context = response.context;
       await saveSessions();
       renderSessions();
+      console.log('Session updated with context');
     }
   } catch (error) {
     console.error('Error generating context:', error);
@@ -235,6 +245,12 @@ async function restoreSession(sessionId) {
     }
 
     showLoading(false);
+
+    // Show info if some tabs were skipped
+    if (response.skipped > 0) {
+      showError(`Session restored! (${response.skipped} protected browser tab${response.skipped > 1 ? 's' : ''} skipped)`);
+      setTimeout(hideError, 3000);
+    }
   } catch (error) {
     showError('Failed to restore session: ' + error.message);
     showLoading(false);

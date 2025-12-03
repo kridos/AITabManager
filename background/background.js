@@ -88,11 +88,37 @@ async function restoreSession(sessionId) {
       throw new Error('Session not found');
     }
 
-    // Create new window with all tabs
-    const urls = session.tabs.map(tab => tab.url);
-    await chrome.windows.create({ url: urls });
+    // Filter out illegal URLs that browsers don't allow extensions to open
+    const illegalPrefixes = [
+      'about:',
+      'chrome:',
+      'edge:',
+      'moz-extension:',
+      'chrome-extension:',
+      'firefox:',
+      'view-source:'
+    ];
 
-    return { success: true };
+    const validUrls = session.tabs
+      .map(tab => tab.url)
+      .filter(url => {
+        const lowerUrl = url.toLowerCase();
+        return !illegalPrefixes.some(prefix => lowerUrl.startsWith(prefix));
+      });
+
+    if (validUrls.length === 0) {
+      throw new Error('No valid URLs to restore (all were protected browser pages)');
+    }
+
+    // Create new window with valid tabs only
+    await chrome.windows.create({ url: validUrls });
+
+    const skipped = session.tabs.length - validUrls.length;
+    return {
+      success: true,
+      restored: validUrls.length,
+      skipped: skipped
+    };
   } catch (error) {
     console.error('Error restoring session:', error);
     throw error;
@@ -102,18 +128,29 @@ async function restoreSession(sessionId) {
 // Generate AI context for a session
 async function generateContextForSession(sessionId, tabs) {
   try {
+    console.log('Generating context for session:', sessionId);
     const settings = await StorageService.getSettings();
+
+    if (!settings.apiKey) {
+      throw new Error('API key not configured. Please add your API key in settings.');
+    }
+
+    console.log('Using AI provider:', settings.aiProvider, 'Model:', settings.model);
     const aiService = new AIService(settings);
 
     // Generate context description
+    console.log('Calling AI service to generate context...');
     const context = await aiService.generateContext(tabs);
+    console.log('Generated context:', context);
 
     // Generate embedding for semantic search
     let embedding = null;
     try {
       if (settings.aiProvider === 'openai') {
+        console.log('Generating embedding...');
         embedding = await aiService.generateEmbedding(context);
         await StorageService.saveEmbedding(sessionId, embedding);
+        console.log('Embedding saved');
       }
     } catch (embeddingError) {
       console.warn('Failed to generate embedding:', embeddingError);
@@ -122,6 +159,7 @@ async function generateContextForSession(sessionId, tabs) {
 
     // Update session with context
     await StorageService.updateSession(sessionId, { context });
+    console.log('Session updated with context');
 
     return { context, hasEmbedding: embedding !== null };
   } catch (error) {
