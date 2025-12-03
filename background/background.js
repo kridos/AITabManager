@@ -250,12 +250,16 @@ async function searchSessionsSemantically(query) {
     const settings = await StorageService.getSettings();
     const sessions = await StorageService.getSessions();
 
+    console.log('Search query:', query);
+    console.log('Total sessions:', sessions.length);
+
     if (sessions.length === 0) {
       return { results: [], method: 'none' };
     }
 
     // Filter sessions with context descriptions
     const sessionsWithContext = sessions.filter(s => s.context);
+    console.log('Sessions with context:', sessionsWithContext.length);
 
     let candidateSessions = sessions;
     let searchMethod = 'text';
@@ -285,34 +289,48 @@ async function searchSessionsSemantically(query) {
           .map(r => r.session);
 
         searchMethod = 'embedding';
+        console.log('Embedding search found:', candidateSessions.length, 'results');
       } catch (error) {
         console.warn('Embedding search failed, falling back:', error);
       }
     }
 
-    // If we have few results or no embedding search, use text search
-    if (candidateSessions.length < 3 || searchMethod === 'text') {
+    // Use text search if no embedding results or not using OpenAI
+    if (candidateSessions.length === 0 || searchMethod === 'text') {
       candidateSessions = sessions.filter(session => {
         const searchText = `${session.name} ${session.context || ''}`.toLowerCase();
-        return searchText.includes(query.toLowerCase());
+        const matches = searchText.includes(query.toLowerCase());
+        if (matches) {
+          console.log('Text match found:', session.name);
+        }
+        return matches;
       });
       searchMethod = 'text';
+      console.log('Text search found:', candidateSessions.length, 'results');
     }
 
-    // Use AI to rank top 3 if we have context descriptions and API key
-    if (settings.apiKey && candidateSessions.length > 3 && sessionsWithContext.length > 0) {
+    // If no results found, return empty
+    if (candidateSessions.length === 0) {
+      console.log('No results found for query:', query);
+      return { results: [], method: searchMethod };
+    }
+
+    // Use AI to rank results if enabled and we have an API key
+    // Changed: Now works with ANY number of results (not just >3)
+    if (settings.aiRanking && settings.apiKey && sessionsWithContext.length > 0) {
       try {
         console.log('Using AI to rank search results...');
         const aiService = new AIService(settings);
         const topResults = await aiService.rankSessionsByRelevance(query, candidateSessions);
-        console.log('AI ranked top results:', topResults.length);
+        console.log('AI ranked results:', topResults.length);
         return { results: topResults, method: 'ai-ranked' };
       } catch (error) {
-        console.warn('AI ranking failed, returning all matches:', error);
+        console.warn('AI ranking failed, returning text/embedding matches:', error);
       }
     }
 
     // Return top 10 results if no AI ranking
+    console.log('Returning results without AI ranking:', candidateSessions.length);
     return {
       results: candidateSessions.slice(0, 10),
       method: searchMethod
