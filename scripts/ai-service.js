@@ -38,7 +38,8 @@ Provide a natural language description that someone could use to search for this
       headers: {
         'Content-Type': 'application/json',
         'x-api-key': this.settings.apiKey,
-        'anthropic-version': '2023-06-01'
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
       },
       body: JSON.stringify({
         model: this.settings.model,
